@@ -259,6 +259,7 @@ do {
 } catch {
     print(error)
 }
+```
 
 ### Check auto-renew status
 
