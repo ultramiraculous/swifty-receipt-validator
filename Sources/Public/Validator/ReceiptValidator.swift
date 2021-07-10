@@ -37,10 +37,14 @@ import StoreKit
 public protocol SwiftyReceiptValidatorType {
     @available(iOS 13, tvOS 13, macOS 10.15, *)
     func validatePublisher(for request: SRVPurchaseValidationRequest) -> AnyPublisher<SRVReceiptResponse, SRVError>
+    @available(iOS 15, tvOS 15, macOS 12.00, *)
+    func validate(_ request: SRVPurchaseValidationRequest) async throws -> SRVReceiptResponse
     func validate(_ request: SRVPurchaseValidationRequest, handler: @escaping (Result<SRVReceiptResponse, SRVError>) -> Void)
-
+    
     @available(iOS 13, tvOS 13, macOS 10.15, *)
     func validatePublisher(for request: SRVSubscriptionValidationRequest) -> AnyPublisher<SRVSubscriptionValidationResponse, SRVError>
+    @available(iOS 15, tvOS 15, macOS 12.00, *)
+    func validate(_ request: SRVSubscriptionValidationRequest) async throws -> SRVSubscriptionValidationResponse
     func validate(_ request: SRVSubscriptionValidationRequest, handler: @escaping (Result<SRVSubscriptionValidationResponse, SRVError>) -> Void)
 }
 
@@ -108,7 +112,7 @@ extension SwiftyReceiptValidator: SwiftyReceiptValidatorType {
 
     /// Validate app store purchase publisher
     ///
-    /// - parameter request: The request configuration.
+    /// - parameter request: The SRVPurchaseValidationRequest configuration.
     @available(iOS 13, tvOS 13, macOS 10.15, *)
     public func validatePublisher(for request: SRVPurchaseValidationRequest) -> AnyPublisher<SRVReceiptResponse, SRVError> {
         Deferred {
@@ -117,10 +121,28 @@ extension SwiftyReceiptValidator: SwiftyReceiptValidatorType {
             }
         }.eraseToAnyPublisher()
     }
+    
+    /// Validate app store purchase
+    ///
+    /// - parameter request: The SRVPurchaseValidationRequest configuration.
+    /// - returns: SRVReceiptResponse when validation has finished successfully.
+    @available(iOS 15, tvOS 15, macOS 12.00, *)
+    public func validate(_ request: SRVPurchaseValidationRequest) async throws -> SRVReceiptResponse {
+        try await withCheckedThrowingContinuation { continuation in
+            validate(request) { result in
+                switch result {
+                case .success(let response):
+                    continuation.resume(returning: response)
+                case .failure(let error):
+                    continuation.resume(throwing: error)
+                }
+            }
+        }
+    }
 
     /// Validate app store purchase
     ///
-    /// - parameter request: The request configuration.
+    /// - parameter request: The SRVPurchaseValidationRequest configuration.
     /// - parameter handler: Completion handler called when the validation has completed.
     public func validate(_ request: SRVPurchaseValidationRequest, handler: @escaping (Result<SRVReceiptResponse, SRVError>) -> Void) {
         fetchReceipt(
@@ -146,7 +168,7 @@ extension SwiftyReceiptValidator: SwiftyReceiptValidatorType {
 
     /// Validate app store subscription publisher
     ///
-    /// - parameter request: The request configuration.
+    /// - parameter request: The SRVSubscriptionValidationRequest configuration.
     @available(iOS 13, tvOS 13, macOS 10.15, *)
     public func validatePublisher(for request: SRVSubscriptionValidationRequest) -> AnyPublisher<SRVSubscriptionValidationResponse, SRVError> {
         Deferred {
@@ -154,11 +176,29 @@ extension SwiftyReceiptValidator: SwiftyReceiptValidatorType {
                 self?.validate(request, handler: promise)
             }
         }.eraseToAnyPublisher()
-     }
+    }
+    
+    /// Validate app store subscription
+    ///
+    /// - parameter request: The SRVSubscriptionValidationRequest configuration.
+    /// - returns: SRVSubscriptionValidationResponse when validation has finished successfully.
+    @available(iOS 15, tvOS 15, macOS 12.00, *)
+    public func validate(_ request: SRVSubscriptionValidationRequest) async throws -> SRVSubscriptionValidationResponse {
+        try await withCheckedThrowingContinuation { continuation in
+            validate(request) { result in
+                switch result {
+                case .success(let response):
+                    continuation.resume(returning: response)
+                case .failure(let error):
+                    continuation.resume(throwing: error)
+                }
+            }
+        }
+    }
 
     /// Validate app store subscription
     ///
-    /// - parameter request: The request configuration.
+    /// - parameter request: The SRVSubscriptionValidationRequest configuration.
     /// - parameter handler: Completion handler called when the validation has completed.
     public func validate(_ request: SRVSubscriptionValidationRequest, handler: @escaping (Result<SRVSubscriptionValidationResponse, SRVError>) -> Void) {
         fetchReceipt(

@@ -173,6 +173,17 @@ let cancellable = receiptValidator
     }
 ```
 
+Note: There is also `Async` support for this method if you are targeting iOS 15 and above.
+
+```swift
+do {
+    let response = try await receiptValidator.validate(validationRequest)
+    print(response)
+} catch {
+    print(error)
+}
+```
+
 ### Validate Subscriptions
 
 - To validate your subscriptions (e.g. on app launch), create a subscription validation request and validate it. This will search for all subscription receipts found on the device.
@@ -238,6 +249,16 @@ let cancellable = receiptValidator
         // handle error
     }
 ```
+
+Note: There is also `Async` support for this method if you are targeting iOS 15 and above.
+
+```swift
+do {
+    let response = try await receiptValidator.validate(validationRequest)
+    print(response)
+} catch {
+    print(error)
+}
 
 ### Check auto-renew status
 
