@@ -13,7 +13,7 @@ protocol ReceiptClientType {
 }
 
 struct ReceiptClientRequest {
-    let receiptURL: URL
+    let receiptData: Data
     let sharedSecret: String?
     let excludeOldTransactions: Bool
 }
@@ -59,33 +59,28 @@ final class ReceiptClient {
 extension ReceiptClient: ReceiptClientType {
     
     func perform(_ request: ReceiptClientRequest, handler: @escaping (Result<SRVReceiptResponse, SRVError>) -> Void) {
-        do {
-            // Prepare url session parameters
-            let receiptData = try Data(contentsOf: request.receiptURL, options: .alwaysMapped)
-            let parameters = Parameters(
-                data: receiptData.base64EncodedString(options: []),
-                excludeOldTransactions: request.excludeOldTransactions,
-                password: request.sharedSecret
-            )
+        // Prepare url session parameters
+        let parameters = Parameters(
+            data: request.receiptData.base64EncodedString(options: []),
+            excludeOldTransactions: request.excludeOldTransactions,
+            password: request.sharedSecret
+        )
 
-            // Start URL request to production server first, if status code returns test environment receipt, try sandbox.
-            startSessionRequest(forURL: productionURL, parameters: parameters) { [weak self] result in
-                guard let self = self else { return }
-                switch result {
-                case .success(let receiptResponse):
-                    switch receiptResponse.status {
-                    case .testReceipt:
-                        self.print("SRVReceiptClient production success with test receipt, trying sandbox mode...")
-                        self.startSessionRequest(forURL: self.sandboxURL, parameters: parameters, handler: handler)
-                    default:
-                        handler(.success(receiptResponse))
-                    }
-                case .failure(let error):
-                    handler(.failure(.other(error)))
+        // Start URL request to production server first, if status code returns test environment receipt, try sandbox.
+        startSessionRequest(forURL: productionURL, parameters: parameters) { [weak self] result in
+            guard let self = self else { return }
+            switch result {
+            case .success(let receiptResponse):
+                switch receiptResponse.status {
+                case .testReceipt:
+                    self.print("SRVReceiptClient production success with test receipt, trying sandbox mode...")
+                    self.startSessionRequest(forURL: self.sandboxURL, parameters: parameters, handler: handler)
+                default:
+                    handler(.success(receiptResponse))
                 }
+            case .failure(let error):
+                handler(.failure(.other(error)))
             }
-        } catch {
-            handler(.failure(.other(error)))
         }
     }
 }

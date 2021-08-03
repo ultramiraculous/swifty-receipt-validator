@@ -8,17 +8,21 @@
 
 import StoreKit
 
-typealias ReceiptURLFetcherCompletion = (Result<URL, SRVError>) -> Void
+typealias ReceiptDataFetcherCompletion = (Result<Data, SRVError>) -> Void
 typealias ReceiptURLFetcherRefreshRequest = SKReceiptRefreshRequest
 
-protocol ReceiptURLFetcherType {
-    func fetch(refreshRequest: ReceiptURLFetcherRefreshRequest?, handler: @escaping ReceiptURLFetcherCompletion)
+typealias ReceiptURLFetcherCompletion = (Result<URL, SRVError>) -> Void
+
+
+protocol ReceiptDataSource {
+    func fetchReceiptData(onCompletion handler: @escaping ReceiptDataFetcherCompletion)
 }
 
 final class ReceiptURLFetcher: NSObject {
     
     // MARK: - Properties
 
+    private let refreshRequest: SKReceiptRefreshRequest?
     private let appStoreReceiptURL: () -> URL?
     private let fileManager: FileManager
     private var completionHandler: ReceiptURLFetcherCompletion?
@@ -33,7 +37,8 @@ final class ReceiptURLFetcher: NSObject {
     
     // MARK: - Initialization
     
-    init(appStoreReceiptURL: @escaping () -> URL?, fileManager: FileManager) {
+    init(refreshLocalReceiptIfNeeded: Bool, appStoreReceiptURL: @escaping () -> URL?, fileManager: FileManager) {
+        self.refreshRequest = refreshLocalReceiptIfNeeded ? SKReceiptRefreshRequest(receiptProperties: nil) : nil
         self.appStoreReceiptURL = appStoreReceiptURL
         self.fileManager = fileManager
     }
@@ -41,25 +46,39 @@ final class ReceiptURLFetcher: NSObject {
 
 // MARK: - ReceiptURLFetcherType
 
-extension ReceiptURLFetcher: ReceiptURLFetcherType {
+extension ReceiptURLFetcher: ReceiptDataSource {
     
-    func fetch(refreshRequest: ReceiptURLFetcherRefreshRequest?, handler: @escaping ReceiptURLFetcherCompletion) {
-        completionHandler = handler
-        
+    func fetch(refreshRequest: ReceiptURLFetcherRefreshRequest?, handler: @escaping ReceiptDataFetcherCompletion) {
+        completionHandler = { [weak self] (result) in
+            let newResult = result.flatMap { url -> Result<Data, SRVError> in
+                do {
+                    let receiptData = try Data(contentsOf: url, options: .alwaysMapped)
+                    return .success(receiptData)
+                } catch {
+                    return .failure(.other(error))
+                }
+            }
+
+            handler(newResult)
+            self?.clean()
+        }
+
         guard hasReceipt, let appStoreReceiptURL = appStoreReceiptURL() else {
             if let refreshRequest = refreshRequest {
                 receiptRefreshRequest = refreshRequest
                 receiptRefreshRequest?.delegate = self
                 receiptRefreshRequest?.start()
             } else {
-                clean()
                 handler(.failure(.noReceiptFoundInBundle))
             }
             return
         }
-        
-        clean()
-        handler(.success(appStoreReceiptURL))
+
+        completionHandler?(.success(appStoreReceiptURL))
+    }
+
+    func fetchReceiptData(onCompletion handler: @escaping (Result<Data, SRVError>) -> Void) {
+        fetch(refreshRequest: nil, handler: handler)
     }
 }
 

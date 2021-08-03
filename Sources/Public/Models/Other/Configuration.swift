@@ -25,7 +25,7 @@ public struct SRVConfiguration: Equatable {
     }
     
     /// Standard validation configuration
-    /// Validates directy with apple servers which is not recommended
+    /// Validates directly with apple servers which is not recommended
     public static let standard = SRVConfiguration(
         productionURL: "https://buy.itunes.apple.com/verifyReceipt",
         sandboxURL: "https://sandbox.itunes.apple.com/verifyReceipt",

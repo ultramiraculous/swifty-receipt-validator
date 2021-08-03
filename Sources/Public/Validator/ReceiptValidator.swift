@@ -54,7 +54,6 @@ public final class SwiftyReceiptValidator {
     // MARK: - Properties
 
     private let configuration: SRVConfiguration
-    private let receiptURLFetcher: ReceiptURLFetcherType
     private let receiptClient: ReceiptClientType
     private let responseValidator: ResponseValidatorType
     
@@ -66,11 +65,6 @@ public final class SwiftyReceiptValidator {
     /// - parameter isLoggingEnabled: Displays console logging events if set to true.
     public init(configuration: SRVConfiguration, isLoggingEnabled: Bool) {
         self.configuration = configuration
-
-        receiptURLFetcher = ReceiptURLFetcher(
-            appStoreReceiptURL: { Bundle.main.appStoreReceiptURL },
-            fileManager: .default
-        )
 
         receiptClient = ReceiptClient(
             sessionManager: URLSessionManager(
@@ -90,11 +84,10 @@ public final class SwiftyReceiptValidator {
     
     // Internal only used for testing
     init(configuration: SRVConfiguration,
-         receiptURLFetcher: ReceiptURLFetcherType,
+         recieptDataSource: ReceiptDataSource,
          receiptClient: ReceiptClientType,
          responseValidator: ResponseValidatorType) {
         self.configuration = configuration
-        self.receiptURLFetcher = receiptURLFetcher
         self.receiptClient = receiptClient
         self.responseValidator = responseValidator
     }
@@ -125,7 +118,7 @@ extension SwiftyReceiptValidator: SwiftyReceiptValidatorType {
     public func validate(_ request: SRVPurchaseValidationRequest, handler: @escaping (Result<SRVReceiptResponse, SRVError>) -> Void) {
         fetchReceipt(
             sharedSecret: request.sharedSecret,
-            refreshLocalReceiptIfNeeded: true,
+            receiptDataSource: request.receiptDataSource,
             excludeOldTransactions: false,
             handler: ({ [weak self] result in
                 switch result {
@@ -163,7 +156,7 @@ extension SwiftyReceiptValidator: SwiftyReceiptValidatorType {
     public func validate(_ request: SRVSubscriptionValidationRequest, handler: @escaping (Result<SRVSubscriptionValidationResponse, SRVError>) -> Void) {
         fetchReceipt(
             sharedSecret: request.sharedSecret,
-            refreshLocalReceiptIfNeeded: request.refreshLocalReceiptIfNeeded,
+            receiptDataSource: request.receiptDataSource,
             excludeOldTransactions: request.excludeOldTransactions,
             handler: ({ [weak self] result in
                 switch result {
@@ -186,16 +179,15 @@ extension SwiftyReceiptValidator: SwiftyReceiptValidatorType {
 private extension SwiftyReceiptValidator {
 
     func fetchReceipt(sharedSecret: String?,
-                      refreshLocalReceiptIfNeeded: Bool,
+                      receiptDataSource: ReceiptDataSource,
                       excludeOldTransactions: Bool,
                       handler: @escaping (Result<SRVReceiptResponse, SRVError>) -> Void) {
-        let refreshRequest = refreshLocalReceiptIfNeeded ? SKReceiptRefreshRequest(receiptProperties: nil) : nil
-        receiptURLFetcher.fetch(refreshRequest: refreshRequest) { [weak self] result in
+        receiptDataSource.fetchReceiptData() { [weak self] result in
             guard let self = self else { return }
             switch result {
-            case .success(let receiptURL):
+            case .success(let receiptData):
                 let clientRequest = ReceiptClientRequest(
-                    receiptURL: receiptURL,
+                    receiptData: receiptData,
                     sharedSecret: sharedSecret,
                     excludeOldTransactions: excludeOldTransactions
                 )
